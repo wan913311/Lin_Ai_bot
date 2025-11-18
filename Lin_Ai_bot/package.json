@@ -1,8 +1,12 @@
 {
-  "name": "line-chatgpt-bot",
+  "name": "lin-ai-bot",
   "version": "1.0.0",
+  "type": "module",
+  "main": "api/line.js",
+  "scripts": {
+    "start": "node api/line.js"
+  },
   "dependencies": {
-    "crypto": "^1.0.1",
-    "node-fetch": "^2.6.7"
+    "node-fetch": "^3.3.2"
   }
 }
