@@ -15,118 +15,107 @@ function validateSignature(body, signature) {
   return hash === signature;
 }
 
-// === System Prompt（完整版） ===
+// === System Prompt（給模型看的角色設定，不會回給用戶） ===
 const systemPrompt = `
-你是「Lin Ai」，一個貼心、自然、不做作、不加戲的生活助理。
-請先記住以下資訊，所有回覆一律使用「繁體中文」，像在 LINE 上聊天。
+你是一個名叫「林刀ㄟ管家」的 LINE 生活助理，只服務一位使用者：林巧婷。
+你的任務是用自然、有溫度、像真人聊天的方式陪她說話與思考。
 
-【使用者：林巧婷】
-- 暱稱：Ting、美女（可交替使用）
-- 43歲，1982/06/22
-- 身高約 160cm，體重約 70kg
-- 久坐上班族＋媽媽，週末會外出走走
-- 晚餐時間約 18:30，睡覺時間約 22:00
-- 飲食偏好：台式、日式、韓式、清爽、湯麵、家常菜
-- 飲料：早上會喝美式咖啡，平常多喝水或茶，偶爾喝手搖或果汁
-- 健康目標：健康飲食、少油少糖、少精緻澱粉，但【不要每次都提】
+【使用者】
+- 姓名：林巧婷，暱稱：Ting、美女。
+- 出生：1982/06/22，43 歲。
+- 身高約 160 cm，體重約 70 kg。
+- 身分：久坐上班族＋媽媽，假日偶爾外出走走。
+- 作息：晚餐約 18:30，睡覺約 22:00。
+- 飲食偏好：台式、日式、韓式、湯麵、清爽口味。
+- 飲料習慣：早上喝美式咖啡，平常以水和茶為主，偶爾喝手搖。
+- 健康方向：希望少油、少糖、少精製澱粉，但她沒有主動問時不要一直提健康建議。
 
-【家庭成員】
-- 老公：廖柏翔（1982/12/24）
-- 大女兒：廖（林）芝頤，2005/04/02，在台中念書
-- 小女兒：廖（林）慧燁，2010/09/05，現在有會考壓力
-- 寵物：
-  - 歐告：公豹貓
-  - 糖糖：母豹貓
-  - 咪咪：母米克斯貓
-  - 小八：豹紋守宮
+【家庭與寵物】
+- 老公：廖柏翔，1982/12/24。
+- 大女兒：芝頤，2005/04/02，在台中念書。
+- 小女兒：慧燁，2010/09/05，國中生，青春期、會考壓力大。
+- 貓：歐告（公豹貓）、糖糖（母豹貓）、咪咪（母米克斯）。
+- 守宮：小八（豹紋守宮）。
 
-【回應風格】
-- 像真人用 LINE 聊天：自然、口語、不要太油膩，也不要太制式。
-- 首要任務：給她情緒價值、支持、陪她站同一陣線。
-- 不糾正錯字，直接理解真實意思，當作她只是打很快。
-- 她在抱怨時，可以適度一起吐槽，但不要變成罵小孩或罵老公的主謀。
-- 回覆長度：大多 1～5 句，視情況可短可長，但不要每次都寫長篇作文。
+【角色定位】
+- 你是她的生活助理、樹洞、秘書、好朋友，優先站在她這一邊。
+- 用繁體中文回覆，語氣自然像 LINE 好友，不官腔、不像客服，也不要像治療師。
+- 回覆要有情緒價值，讓她覺得被理解、被支持，但不要變成過度灑雞湯。
 
-【禁止加戲】
-- 不要自己亂加劇情（例如「你昨天一定怎樣」這種沒講過的事）。
-- 不要亂幫她安排行程、亂開藥、亂給醫療或嚴肅健康建議。
-- 她只是在抱怨或分享時，可以停在情緒陪伴，不一定要問問題逼她接話。
-- 若前後訊息顯示她只是想說一句話（例如「趙露思水好好喝」），
-  可以只回應「附和＋簡短稱讚」即可，不用再多問一堆問題。
+【回覆風格】
+- 每次回覆大約 1～5 句即可，可搭配少量 emoji。
+- 不糾正她的錯字，也不要指出她打錯字，直接用正確理解來回應。
+- 不需要每次都反問問題，多數情況只要好好回應就可以。
+- 如果真的需要提問，一個回覆中最多只問一個簡短問題。
+- 可以偶爾用「抱一下」類型的安慰語，但不要每次都用同一句開頭。
 
-【訊息合併規則】
-- 她常常把一句話切成很多則訊息傳送，例如：
-  「幹」「那個同事」「又不給錢」
-- 系統會幫你把「最近幾秒內的多則訊息」合併成一段文字給你。
-- 你在回覆時要把這些內容當作「一整段在說同一件事」來理解，
-  針對整體情況給一則整體回覆，不要一條條各自回答。
+【飲食與健康】
+- 她沒有主動問「吃什麼」、「要怎麼吃比較好」、「怎麼選外食」時，不主動推薦菜單或飲食計畫。
+- 她主動詢問飲食相關問題時，再給出實際可行、貼近她生活情況的建議。
+- 建議要考慮她是上班族、常外食、時間有限，避免理想化或太教科書式的回答。
+
+【情緒與抱怨】
+- 她抱怨家人、同事、小孩時，要先理解她的心情，站在她的立場說話。
+- 可以幫她吐槽事情本身，但避免重度攻擊某個人的人品。
+- 不要幫對方找藉口或合理化，避免讓她覺得你沒有站在她這邊。
+- 有需要時可以溫柔提醒她照顧自己的身心，但要簡短、不說教。
+
+【多則訊息】
+- 後端可能已經把她同一輪連續傳的多則訊息合併成一段文字給你。
+- 把這段文字當成同一件事在描述，理解重點後，給出一段自然的回覆即可。
+- 不需要逐條拆開回，也不要重複她的話。
+
+【嚴禁行為】
+- 不要提到自己是模型、AI、系統，不要提到任何「規則」「指令」之類的字眼。
+- 不要在回覆中說「根據你的訊息」、「按照設定」這種 meta 說法。
+- 不要自行編造她沒有提過的細節或故事。
+- 不要逼她做情緒深度分析，她來聊天主要是想被陪伴與放鬆。
+
+現在，請你根據她這次傳來的內容，給出一段自然、有溫度、貼近情境的回覆。
 `.trim();
 
-// === 短期訊息緩衝區（記 4 秒內、最多 10 則） ===
-const MERGE_WINDOW_MS = 4000;
-const MAX_BUFFER_MSGS = 10;
-
-// key: userId / groupId / roomId  ->  [{ text, time }]
-const sessionBuffers = new Map();
-
-function getSessionKey(source) {
-  return source.userId || source.groupId || source.roomId || "unknown";
-}
-
-function updateAndGetMergedText(source, newText) {
-  const key = getSessionKey(source);
-  const now = Date.now();
-
-  const prev = sessionBuffers.get(key) || [];
-  // 只保留最近 4 秒內的訊息
-  const alive = prev.filter(m => now - m.time <= MERGE_WINDOW_MS);
-
-  alive.push({ text: newText, time: now });
-
-  // 最多記 10 則，太舊的丟掉
-  const trimmed = alive.slice(-MAX_BUFFER_MSGS);
-  sessionBuffers.set(key, trimmed);
-
-  return trimmed.map(m => m.text.trim()).join(" / ");
-}
-
-// === 呼叫 OpenRouter DeepSeek ===
-async function askAI(latestText, mergedText) {
+// === 呼叫 OpenRouter（DeepSeek） ===
+async function askAI(userText, mergedText) {
   const messages = [{ role: "system", content: systemPrompt }];
 
-  if (mergedText && mergedText !== latestText) {
+  // 若有多則訊息合併內容，先提供給模型當脈絡
+  if (mergedText && mergedText !== userText) {
     messages.push({
       role: "user",
-      content: `以下是最近幾則訊息合併後的內容（代表整體狀況）：\n${mergedText}`
+      content: `以下是同一輪對話中，使用者連續傳的多則訊息，已合併成一段：\n${mergedText}`
     });
   }
 
-  messages.push({
-    role: "user",
-    content: `這是使用者最後傳的那一句（請優先對這一句做自然回應）：\n${latestText}`
-  });
+  // 最後一則訊息當作主詢問
+  messages.push({ role: "user", content: userText });
 
-  const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${OPENROUTER_API_KEY}`
-    },
-    body: JSON.stringify({
-      model: "deepseek/deepseek-chat",
-      messages,
-      temperature: 0.65
-    })
-  });
+  try {
+    const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${OPENROUTER_API_KEY}`,
+        "X-Title": "Lin-Ai-Line-Bot"
+      },
+      body: JSON.stringify({
+        model: "deepseek/deepseek-chat",
+        messages,
+        temperature: 0.65
+      })
+    });
 
-  const data = await response.json();
+    const data = await response.json();
 
-  if (!data?.choices?.[0]?.message?.content) {
-    console.error("OpenRouter 回傳內容異常：", JSON.stringify(data));
-    return "我有聽到妳說的，但好像一時接不到訊號，再跟我說一次好嗎？";
+    const text = data?.choices?.[0]?.message?.content;
+    if (!text) {
+      return "我剛剛有點當機，再跟我說一次，我在這裡陪著你。";
+    }
+
+    return text.trim();
+  } catch (err) {
+    console.error("OpenRouter / DeepSeek error:", err);
+    return "我這邊系統小當了一下，不過我有聽到你的話，等等再多跟我說一點也可以。";
   }
-
-  return data.choices[0].message.content.trim();
 }
 
 // === 回覆 LINE ===
@@ -146,33 +135,53 @@ async function replyMessage(replyToken, text) {
 
 // === 主 Handler ===
 export default async function handler(req, res) {
+  // 只接受 POST，其他直接 405
+  if (req.method !== "POST") {
+    return res.status(405).send("Method Not Allowed");
+  }
+
+  let rawBody = "";
+
+  req.on("data", chunk => {
+    rawBody += chunk;
+  });
+
+  await new Promise(resolve => {
+    req.on("end", resolve);
+  });
+
+  const signature = req.headers["x-line-signature"];
+  if (!validateSignature(rawBody, signature)) {
+    return res.status(400).send("Invalid signature");
+  }
+
+  const body = JSON.parse(rawBody || "{}");
+  const events = body.events || [];
+
+  // 只處理文字訊息
+  const textEvents = events.filter(
+    e => e.type === "message" && e.message && e.message.type === "text"
+  );
+
+  if (textEvents.length === 0) {
+    return res.status(200).send("OK");
+  }
+
+  // 同一批事件的訊息合併，例如：「幹」「那個同事」「又不給錢」
+  const mergedText = textEvents
+    .map(e => (e.message.text || "").trim())
+    .filter(t => t.length > 0)
+    .join(" / ");
+
+  const lastEvent = textEvents[textEvents.length - 1];
+  const lastText = (lastEvent.message.text || "").trim();
+
   try {
-    let rawBody = "";
-    req.on("data", chunk => (rawBody += chunk));
-    await new Promise(resolve => req.on("end", resolve));
-
-    const signature = req.headers["x-line-signature"];
-    if (!validateSignature(rawBody, signature)) {
-      return res.status(400).send("Invalid signature");
-    }
-
-    const body = JSON.parse(rawBody);
-    const events = body.events || [];
-
-    for (const event of events) {
-      if (event.type !== "message") continue;
-      if (!event.message || event.message.type !== "text") continue;
-
-      const userText = event.message.text || "";
-      const mergedText = updateAndGetMergedText(event.source, userText);
-
-      const aiReply = await askAI(userText, mergedText);
-      await replyMessage(event.replyToken, aiReply);
-    }
-
-    res.status(200).send("OK");
+    const aiReply = await askAI(lastText, mergedText);
+    await replyMessage(lastEvent.replyToken, aiReply);
   } catch (err) {
     console.error("LINE handler error:", err);
-    res.status(500).send("Internal Server Error");
   }
+
+  return res.status(200).send("OK");
 }
