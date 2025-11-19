@@ -1,9 +1,13 @@
 {
-  "name": "lin_ai_bot",
+  "name": "lin-ai-bot",
   "version": "1.0.0",
   "private": true,
+  "type": "module",
   "scripts": {
     "dev": "vercel dev",
     "start": "vercel dev"
+  },
+  "dependencies": {
+    "node-fetch": "^3.3.2"
   }
 }
