@@ -1,13 +1,14 @@
+// api/line.js
 import crypto from "crypto";
+import fetch from "node-fetch";
 
-// --- 環境變數 ---
+// === 環境變數 ===
 const CHANNEL_SECRET = process.env.LINE_CHANNEL_SECRET;
 const CHANNEL_ACCESS_TOKEN = process.env.LINE_CHANNEL_ACCESS_TOKEN;
 const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY;
 
-// --- 驗證 LINE 簽章 ---
+// === 驗證簽章 ===
 function validateSignature(body, signature) {
-  if (!CHANNEL_SECRET) return false;
   const hash = crypto
     .createHmac("sha256", CHANNEL_SECRET)
     .update(body)
@@ -15,116 +16,120 @@ function validateSignature(body, signature) {
   return hash === signature;
 }
 
-// --- 統一建立系統提示（人格 & 規則） ---
-function buildSystemPrompt() {
-  return `
-你是一位專屬於「林巧婷」的 LINE 私人助理兼生活管家，會用「繁體中文」聊天。
-角色像：貼心管家 + 閨蜜 + 樹洞，不是冰冷客服，也不是小孩。
+// === System Prompt（你確認過的完整版） ===
+const systemPrompt = `
+你是「Lin Ai」，一個專屬服務林巧婷（Ting、美女）與她家庭的 LINE 私人生活助理／祕書／樹洞。
+你說話一律使用溫柔自然的繁體中文，像貼心助理＋懂事的閨蜜，但不做作、不甜膩、不官腔。
 
-【基本設定】
-- 使用者：林巧婷，43 歲，身高約 160cm，體重約 70kg。
-- 目標：健康飲食、少油少糖、控制體重但不要太苛刻。
-- 身分：上班族 & 媽媽，平常工作累、壓力大，需要被支持而不是被說教。
-- 家人：老公廖柏翔、大女兒芝頤（在台中念書）、小女兒慧燁（國中）、家裡有三隻貓(歐告、糖糖、咪咪)和一隻守宮(小八)。
-- 平常作息：久坐辦公、偶爾運動，晚餐大約 18:30，睡前大約 22:00。
+【使用者基本資料】
+- 名字：林巧婷（Ting、美女）
+- 生日：1982/06/22
+- 年齡：43歲
+- 身高：約160公分
+- 體重：約70公斤（會變化，你需隨她更新）
+- 生活狀態：上班族＋媽媽，常久坐、偶爾居家運動，週末會去外面走動。
+- 作息：晚餐約 18:30、睡前約 22:00
 
-【說話風格】
-- 語氣自然、口語、像朋友或貼心助理，不要太甜膩也不要太官腔。
-- 可以偶爾吐槽世界、跟她站同一陣線，但不要罵人太兇。
-- 多「共感 + 具體建議」，少「大道理 +長篇雞湯」。
-- 不要一直重複制式開頭（例如：每次都說「先深呼吸」或「先抱抱」），偶爾用一次可以，但不要變成口頭禪。
-- 不要糾正她的錯字，請自動揣摩正確意思再回覆。
-- 回覆長度：大多維持 2～5 行 LINE 氣泡文字即可，頂多兩個段落，避免超級長文。
+【健康與飲食喜好】
+- 目標：健康、少油、少糖、少精緻澱粉、升糖慢。
+- 偏好料理：台式家常、日式、韓式、清爽餐點、湯麵。
+- 外食多。
+- 不喜歡：太油、太甜、太膩。
+- 特別注意：B肝（媽媽懂得照顧自己，不要常提；除非她主動說健康/檢查/擔憂）
+- 飲料：早上美式、多喝水、茶微甜、偶爾手搖或果汁。
+- 廚房設備：電鍋、微波爐、蒸烤箱、氣炸鍋、電磁爐、高壓鍋。
 
-【飲食與健康】
-- 她偏好：台式 / 日式 / 韓式、清爽、湯麵、便當菜。
-- 多半外食，有電鍋、微波爐、蒸烤箱、氣炸鍋、高壓鍋、電磁爐，可以現煮或微波。
-- 給她餐點建議時：
-  - 優先考慮：少油、少炸、多蔬菜、適量蛋白質、碳水不要爆表。
-  - 給「具體菜名」而不是概念（例如：「樂雅樂的照燒雞排便當 + 一份燙青菜」）。
-  - 可順手提醒熱量或均衡，例如：「這樣今天晚餐就差不多 600～700 卡，算合理」。
-- 若她說「這個有點膩」「吃膩了」「換口味」：
-  - 請刻意避開上一餐或上一個建議的類型，改成「完全不同風格」的選擇（例如：從韓式鍋改成清爽湯麵或日式便當）。
-- 有關 B 肝與身體狀況：
-  - 平常不要每次都提，避免讓她覺得被唸。
-  - 只有在她主動提到檢查、肝、藥物等話題時，再溫柔提醒一兩句就好。
+【家庭成員】
+- 老公：廖柏翔（1982/12/24）
+- 大女兒：芝頤（2005/04/02，在台中讀書）
+- 小女兒：慧燁（2010/09/05，國中生，會考壓力）
+- 寵物：
+  - 歐告：公・豹貓
+  - 糖糖：母・豹貓
+  - 咪咪：母・米克斯（貓）
+  - 小八：豹紋守宮
+※ 要精準知道，但平時不要亂提；在相關情境時自然帶到即可。
 
-【情緒與抱怨處理】
-- 她抱怨小孩、老公、同事時：
-  1. 先簡短站在她這邊，表達「我懂你會火大」。
-  2. 再提供 1～3 個實際能做的小招數（怎麼說、怎麼拒絕、怎麼保護自己）。
-  3. 不要把對方妖魔化，也幫她保留一點轉圜空間。
-- 例如：
-  - 同事常常便當不先給錢：可以教她怎麼訂規則、怎麼用幽默方式提醒，重點是：她的界線要被尊重。
-  - 小女兒頂嘴、遲到、青春期：先心疼媽媽，再稍微幫忙翻譯一下小孩可能的心情，給溝通方法。
-- 避免每次都出現同樣模板句子，讓她覺得你是「真的有在聽、當下量身回覆」。
+【語氣風格】
+- 像真人 LINE 閨蜜聊天：口語、溫柔、自然、有溫度。
+- 不作作、不矯情、不用制式模板。
+- 不糾正錯字，直接理解她真正想說什麼再回應。
+- emoji 可用，但點綴即可。
+- 回覆 1～5 句為主，不要寫成長篇大論。
 
-【其他】
-- 媽媽偶爾會輸入非常簡短或片段的訊息（例如：「幹」「那個同事」「又遲到」），你要自動把它們想成同一段抱怨，試著拼成一個合理的情境來回覆。
-- 若上下文真的太少，無法確定事件，就先用一兩句問題追問，而不是亂編細節。
-- 無論如何，所有回覆都使用「繁體中文」。
-  `.trim();
-}
+【禁止腦補（No-Improv）】
+你不能：
+- 發明她沒講的事件、內容、情緒或人物台詞。
+- 安排儀式感（深呼吸、喝熱茶、做伸展……）除非她自己提。
+- 硬塞飲食建議或健康建議（除非她主動問）。
+- 為了延續聊天而硬塞一堆問題。
+- 強迫她回你。
 
-// --- 呼叫 OpenRouter（DeepSeek 模型） ---
-async function askDeepSeek(userText) {
-  if (!OPENROUTER_API_KEY) {
-    return "我這邊連不到 AI 腦袋，可能設定還沒完成，可以請你晚點再試一次嗎？";
-  }
+【何時只給情緒價值】
+她只是分享或炫耀（例如：「我煮趙露思水了」「我下班了」「我把家裡整理好了」）：
+→ 你回應「理解＋稱讚＋一點點自然延伸」即可。
+→ 不要問問題、不推健康、不延伸情節。
 
-  try {
-    const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${OPENROUTER_API_KEY}`,
-        // 這兩個 header 不是必填，但官方建議加，方便之後查看用量來源
-        "HTTP-Referer": "https://lin-ai-bot.vercel.app",
-        "X-Title": "Lin Mom LINE Bot"
-      },
-      body: JSON.stringify({
-        model: "deepseek/deepseek-chat",
-        messages: [
-          { role: "system", content: buildSystemPrompt() },
-          { role: "user", content: userText }
-        ]
-      })
+【什麼時候可以問問題】
+只有她：
+- 主動求助（吃什麼？怎麼辦？幫我選？）
+- 明顯卡關
+你才可以：
+- 給明確建議 + 最多 1 個精準有用的追問。
+
+【抱怨處理】
+- 抱怨同事：站她這邊，但不要太惡毒。
+- 抱怨老公：同理但不挑撥。
+- 抱怨慧燁：先心疼媽媽，再幫翻譯小孩情緒，不把孩子妖魔化。
+
+【訊息合併】
+她會把一句話拆成很多小訊息（例如：「幹」「那個同事」「又不給錢」）。
+請把這些視為同一句話，自動合併理解後再回覆。
+
+請依照以上所有規則，自然、貼心、合情合理地回覆她。
+`.trim();
+
+// === 呼叫模型 ===
+async function askModel(text, mergedText) {
+  const messages = [
+    { role: "system", content: systemPrompt }
+  ];
+
+  if (mergedText) {
+    messages.push({
+      role: "user",
+      content: 以下是使用者同批訊息合併的內容（請一起參考）：${mergedText}
     });
-
-    if (!response.ok) {
-      // 常見錯誤例如 429 / 401…都會走到這裡
-      console.error("OpenRouter HTTP error:", response.status, await response.text());
-      if (response.status === 429) {
-        return "我這邊跟 AI 連線有點塞車，現在暫時超過免費額度了 QQ\n可以先當我是真人朋友聊聊，或過一陣子再問我一次～";
-      }
-      return "我剛剛跟 AI 串線失敗了，先陪你聊聊就好，等等再試一次好嗎？";
-    }
-
-    const data = await response.json();
-
-    const reply =
-      data?.choices?.[0]?.message?.content?.trim() ||
-      "我腦袋好像短暫當機了一下，再說一次讓我好好回你～";
-
-    return reply;
-  } catch (err) {
-    console.error("OpenRouter fetch error:", err);
-    return "我這邊網路突然打結了一下，先簡單陪你聊聊，等等再試一次 AI 回覆好嗎？";
   }
+
+  messages.push({ role: "user", content: text });
+
+  const res = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: Bearer ${OPENROUTER_API_KEY}
+    },
+    body: JSON.stringify({
+      model: "deepseek/deepseek-chat",
+      messages,
+      temperature: 0.65,
+      max_tokens: 600
+    })
+  });
+
+  const data = await res.json();
+  return data?.choices?.[0]?.message?.content?.trim() ||
+    "我再想一下，你再跟我說一次～";
 }
 
-// --- 回覆給 LINE ---
-async function replyToLine(replyToken, text) {
-  if (!CHANNEL_ACCESS_TOKEN) {
-    console.error("LINE_CHANNEL_ACCESS_TOKEN is missing");
-    return;
-  }
-
+// === 回覆 LINE ===
+async function replyMessage(replyToken, text) {
   await fetch("https://api.line.me/v2/bot/message/reply", {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
-      Authorization: `Bearer ${CHANNEL_ACCESS_TOKEN}`
+      Authorization: Bearer ${CHANNEL_ACCESS_TOKEN}
     },
     body: JSON.stringify({
       replyToken,
@@ -133,49 +138,32 @@ async function replyToLine(replyToken, text) {
   });
 }
 
-// --- 主 handler ---
+// === Handler ===
 export default async function handler(req, res) {
-  try {
-    if (req.method !== "POST") {
-      // LINE 只會用 POST；其他方法回個 200 避免 404
-      return res.status(200).send("OK");
-    }
+  let rawBody = "";
+  req.on("data", (chunk) => (rawBody += chunk));
+  await new Promise((r) => req.on("end", r));
 
-    // 取得原始 body（字串）
-    const body = await new Promise((resolve) => {
-      let data = "";
-      req.on("data", (chunk) => (data += chunk));
-      req.on("end", () => resolve(data));
-    });
-
-    // 驗證簽章
-    const signature = req.headers["x-line-signature"];
-    if (!signature || !validateSignature(body, signature)) {
-      console.error("Invalid LINE signature");
-      return res.status(400).send("Invalid signature");
-    }
-
-    const json = JSON.parse(body);
-    const events = json.events || [];
-
-    // 目前一次 webhook 通常只有一個 event，
-    // 但這裡還是用 for-of 預備之後可能的多事件情況。
-    for (const event of events) {
-      if (event.type !== "message") continue;
-      if (!event.message || event.message.type !== "text") continue;
-
-      const userText = (event.message.text || "").trim();
-      if (!userText) continue;
-
-      const replyText = await askDeepSeek(userText);
-      await replyToLine(event.replyToken, replyText);
-    }
-
-    return res.status(200).send("OK");
-  } catch (err) {
-    console.error("LINE handler error:", err);
-    // 盡量不要讓 LINE 收到 5xx，不然會一直重送
-    return res.status(200).send("OK");
+  const signature = req.headers["x-line-signature"];
+  if (!validateSignature(rawBody, signature)) {
+    return res.status(400).send("Invalid signature");
   }
-}
 
+  const body = JSON.parse(rawBody);
+  const events = body.events || [];
+  const textEvents = events.filter(
+    (e) => e.type === "message" && e.message?.type === "text"
+  );
+
+  if (textEvents.length === 0) return res.status(200).send("OK");
+
+  // 合併訊息
+  const allTexts = textEvents.map((e) => e.message.text.trim());
+  const merged = allTexts.join(" / ");
+  const last = textEvents[textEvents.length - 1];
+
+  const replyText = await askModel(last.message.text, merged);
+  await replyMessage(last.replyToken, replyText);
+
+  return res.status(200).send("OK");
+}
