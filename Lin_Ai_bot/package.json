@@ -1,8 +1,9 @@
 {
-  "name": "line-chatgpt-bot",
+  "name": "lin_ai_bot",
   "version": "1.0.0",
-  "dependencies": {
-    "crypto": "^1.0.1",
-    "node-fetch": "^2.6.7"
+  "private": true,
+  "scripts": {
+    "dev": "vercel dev",
+    "start": "vercel dev"
   }
 }
