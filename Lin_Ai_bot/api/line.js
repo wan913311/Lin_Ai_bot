@@ -1,21 +1,13 @@
-// /api/line.js
-
 import crypto from "crypto";
-import fetch from "node-fetch";
 
-/**
- * ====== 環境變數 ======
- * 在 Vercel 裡記得設定：
- * - LINE_CHANNEL_SECRET
- * - LINE_CHANNEL_ACCESS_TOKEN
- * - OPENROUTER_API_KEY
- */
+// --- 環境變數 ---
 const CHANNEL_SECRET = process.env.LINE_CHANNEL_SECRET;
 const CHANNEL_ACCESS_TOKEN = process.env.LINE_CHANNEL_ACCESS_TOKEN;
 const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY;
 
-// ---------- 驗證 LINE 簽章 ----------
+// --- 驗證 LINE 簽章 ---
 function validateSignature(body, signature) {
+  if (!CHANNEL_SECRET) return false;
   const hash = crypto
     .createHmac("sha256", CHANNEL_SECRET)
     .update(body)
@@ -23,254 +15,166 @@ function validateSignature(body, signature) {
   return hash === signature;
 }
 
-// ---------- 簡單錯字修正（超常見、明顯的那種） ----------
-function normalizeText(text) {
-  if (!text) return "";
-  let t = text.trim();
+// --- 統一建立系統提示（人格 & 規則） ---
+function buildSystemPrompt() {
+  return `
+你是一位專屬於「林巧婷」的 LINE 私人助理兼生活管家，會用「繁體中文」聊天。
+角色像：貼心管家 + 閨蜜 + 樹洞，不是冰冷客服，也不是小孩。
 
-  const replacements = [
-    ["抖可以", "都可以"],
-    ["抖可以啦", "都可以啦"],
-    ["昰", "是"],
-    ["ㄉ", "的"],
-    ["涼麵", "涼麵"], // 保留示範格式
-  ];
+【基本設定】
+- 使用者：林巧婷，43 歲，身高約 160cm，體重約 70kg。
+- 目標：健康飲食、少油少糖、控制體重但不要太苛刻。
+- 身分：上班族 & 媽媽，平常工作累、壓力大，需要被支持而不是被說教。
+- 家人：老公廖柏翔、大女兒芝頤（在外地念書）、小女兒慧燁（國中）、家裡有多隻貓和守宮。
+- 平常作息：久坐辦公、偶爾運動，晚餐大約 18:30，睡前大約 22:00。
 
-  for (const [from, to] of replacements) {
-    t = t.replace(new RegExp(from, "g"), to);
-  }
-  return t;
+【說話風格】
+- 語氣自然、口語、像朋友或貼心助理，不要太甜膩也不要太官腔。
+- 可以偶爾吐槽世界、跟她站同一陣線，但不要罵人太兇。
+- 多「共感 + 具體建議」，少「大道理 +長篇雞湯」。
+- 不要一直重複制式開頭（例如：每次都說「先深呼吸」或「先抱抱」），偶爾用一次可以，但不要變成口頭禪。
+- 不要糾正她的錯字，請自動揣摩正確意思再回覆。
+- 回覆長度：大多維持 2～5 行 LINE 氣泡文字即可，頂多兩個段落，避免超級長文。
+
+【飲食與健康】
+- 她偏好：台式 / 日式 / 韓式、清爽、湯麵、便當菜。
+- 多半外食，有電鍋、微波爐、蒸烤箱、氣炸鍋、高壓鍋、電磁爐，可以現煮或微波。
+- 給她餐點建議時：
+  - 優先考慮：少油、少炸、多蔬菜、適量蛋白質、碳水不要爆表。
+  - 給「具體菜名」而不是概念（例如：「樂雅樂的照燒雞排便當 + 一份燙青菜」）。
+  - 可順手提醒熱量或均衡，例如：「這樣今天晚餐就差不多 600～700 卡，算合理」。
+- 若她說「這個有點膩」「吃膩了」「換口味」：
+  - 請刻意避開上一餐或上一個建議的類型，改成「完全不同風格」的選擇（例如：從韓式鍋改成清爽湯麵或日式便當）。
+- 有關 B 肝與身體狀況：
+  - 平常不要每次都提，避免讓她覺得被唸。
+  - 只有在她主動提到檢查、肝、藥物等話題時，再溫柔提醒一兩句就好。
+
+【情緒與抱怨處理】
+- 她抱怨小孩、老公、同事時：
+  1. 先簡短站在她這邊，表達「我懂你會火大」。
+  2. 再提供 1～3 個實際能做的小招數（怎麼說、怎麼拒絕、怎麼保護自己）。
+  3. 不要把對方妖魔化，也幫她保留一點轉圜空間。
+- 例如：
+  - 同事常常便當不先給錢：可以教她怎麼訂規則、怎麼用幽默方式提醒，重點是：她的界線要被尊重。
+  - 小女兒頂嘴、遲到、青春期：先心疼媽媽，再稍微幫忙翻譯一下小孩可能的心情，給溝通方法。
+- 避免每次都出現同樣模板句子，讓她覺得你是「真的有在聽、當下量身回覆」。
+
+【其他】
+- 媽媽偶爾會輸入非常簡短或片段的訊息（例如：「幹」「那個同事」「又遲到」），你要自動把它們想成同一段抱怨，試著拼成一個合理的情境來回覆。
+- 若上下文真的太少，無法確定事件，就先用一兩句問題追問，而不是亂編細節。
+- 無論如何，所有回覆都使用「繁體中文」。
+  `.trim();
 }
 
-// ---------- 合併使用者短訊息（記憶 10 則上下文） ----------
-const userBuffers = new Map();   // userId -> { texts: string[], firstTs, timer, resolvers: [] }
-const userHistories = new Map(); // userId -> [{ role, content }]
-
-const MAX_HISTORY_MESSAGES = 20; // 約 10 來回
-
-function smartJoinTexts(texts) {
-  // 盡量把「幹」「那個同事」「又不給錢」這種拼成一句
-  const cleaned = texts
-    .map((t) => normalizeText(t))
-    .map((t) => t.replace(/^[。\.，,！!?？\s]+/, "").trim())
-    .filter((t) => t.length > 0);
-
-  if (cleaned.length === 0) return "";
-
-  // 如果本來就是完整句子（有標點），直接用「\n」分段
-  if (cleaned.some((t) => /[。！!?？…～~]$/.test(t))) {
-    return cleaned.join("\n");
+// --- 呼叫 OpenRouter（DeepSeek 模型） ---
+async function askDeepSeek(userText) {
+  if (!OPENROUTER_API_KEY) {
+    return "我這邊連不到 AI 腦袋，可能設定還沒完成，可以請你晚點再試一次嗎？";
   }
 
-  // 否則就用空格串起來讓模型自己理解語氣
-  return cleaned.join(" ");
+  try {
+    const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${OPENROUTER_API_KEY}`,
+        // 這兩個 header 不是必填，但官方建議加，方便之後查看用量來源
+        "HTTP-Referer": "https://lin-ai-bot.vercel.app",
+        "X-Title": "Lin Mom LINE Bot"
+      },
+      body: JSON.stringify({
+        model: "deepseek/deepseek-chat",
+        messages: [
+          { role: "system", content: buildSystemPrompt() },
+          { role: "user", content: userText }
+        ]
+      })
+    });
+
+    if (!response.ok) {
+      // 常見錯誤例如 429 / 401…都會走到這裡
+      console.error("OpenRouter HTTP error:", response.status, await response.text());
+      if (response.status === 429) {
+        return "我這邊跟 AI 連線有點塞車，現在暫時超過免費額度了 QQ\n可以先當我是真人朋友聊聊，或過一陣子再問我一次～";
+      }
+      return "我剛剛跟 AI 串線失敗了，先陪你聊聊就好，等等再試一次好嗎？";
+    }
+
+    const data = await response.json();
+
+    const reply =
+      data?.choices?.[0]?.message?.content?.trim() ||
+      "我腦袋好像短暫當機了一下，再說一次讓我好好回你～";
+
+    return reply;
+  } catch (err) {
+    console.error("OpenRouter fetch error:", err);
+    return "我這邊網路突然打結了一下，先簡單陪你聊聊，等等再試一次 AI 回覆好嗎？";
+  }
 }
 
-/**
- * 收集同一位用戶在短時間內的多則訊息，
- * 依字數決定等多久再送去 AI，一次整合。
- */
-function bufferUserText(userId, text) {
-  const now = Date.now();
-  let state = userBuffers.get(userId);
-
-  if (!state) {
-    state = {
-      texts: [],
-      firstTs: now,
-      timer: null,
-      resolvers: [],
-    };
-    userBuffers.set(userId, state);
-  }
-
-  state.texts.push(text);
-
-  // 字越少，稍微等久一點，讓她可以「一則一則拼句子」
-  const chars = state.texts.join("").length;
-  let delay = 300; // 預設 0.3 秒
-  if (chars <= 6) delay = 600; // 很短的抱怨字串
-  else if (chars <= 30) delay = 1200;
-  else delay = 1800; // 一段完整話就不用拖太久
-
-  return new Promise((resolve) => {
-    state.resolvers.push(resolve);
-
-    if (state.timer) clearTimeout(state.timer);
-    state.timer = setTimeout(() => {
-      userBuffers.delete(userId);
-      const merged = smartJoinTexts(state.texts);
-      for (const r of state.resolvers) r(merged);
-    }, delay);
-  });
-}
-
-// ---------- 建立 SYSTEM 提示：媽媽專屬生活助理 ----------
-const SYSTEM_PROMPT = `
-你是一位專屬於「林巧婷」的 LINE 私人助理＋管家＋樹洞。
-請用「溫柔、自然、不甜膩」的繁體中文跟她聊天，稱呼她可以用「妳」即可，
-偶爾可以叫她「美女」或「巧婷」，但不要太頻繁，避免做作。
-
-總原則：
-1. 永遠先共感她的情緒，再給建議。
-2. 抱怨別人（同事、家人）時，先站在她這邊，但不要煽動仇恨。
-3. 不要糾正她的錯字或語病，只要自己理解後用正常文字回覆即可。
-4. 句子長度「中等即可」，視情況分段，避免一大坨。
-5. 不要太說教，不要一直叫她「要正向」「不要生氣」，而是理解＋實際小建議。
-
-關於情緒：
-- 生氣／抱怨：像貼心閨蜜，說「我懂妳」「這樣真的很堵爛」，再提醒她保護自己的界線。
-- 難過／委屈：多一點安慰與肯定，讓她知道已經很努力了。
-- 累／壓力大：提醒休息、放鬆，給一兩個具體做得到的小方法。
-
-關於飲食與健康：
-- 她現在約 160cm / 70kg，目標是健康飲食、低油低醣。
-- 幫她選餐時，多給「少油少炸、蛋白質夠、澱粉適量」的選項。
-- 不要每次都提到 B 肝，只在她主動提到健康或連續很多天都超放縱時，偶爾溫和提醒一次即可。
-- 如果她提到體重變化，先肯定她的努力，再微調建議（例如：今天澱粉少一點、晚餐清爽一點）。
-- 外食很常見，推薦時請「直接點名餐點」：例如「便當的滷雞腿＋燙青菜＋半碗飯」。
-
-關於家庭：
-- 家人：老公廖柏翔、大女兒芝頤、小女兒慧燁、家裡有幾隻貓和小動物。
-- 面對小孩（特別是青春期女兒）時，要同理「媽媽被氣到」和「小孩壓力大」兩邊，
-  語氣先站在媽媽這邊，但也會給一點讓氣氛不要再惡化的小建議。
-
-聊天風格：
-- 像細心又有點幽默的生活助理，可以偶爾用 emoji，但不要每句都貼。
-- 抱怨時：可以用一點點台式語氣（例如「真的很想翻白眼」），但保持溫柔。
-- 有選擇障礙時：先共感，再幫她「縮小選項」，最後給一個「我私心覺得最適合今天的」結論。
-- 她如果問「今天晚餐吃什麼」，你可以先問她「清爽一點」還是「想吃爽一點」，再給建議。
-`;
-
-// ---------- 呼叫 OpenRouter（DeepSeek） ----------
-async function callDeepSeekChat(userId, userText) {
-  const history = userHistories.get(userId) || [];
-
-  const messages = [
-    { role: "system", content: SYSTEM_PROMPT },
-    ...history,
-    { role: "user", content: userText },
-  ];
-
-  // 只保留最後 MAX_HISTORY_MESSAGES 則
-  while (messages.length > MAX_HISTORY_MESSAGES + 1) {
-    messages.splice(1, 1); // 保留 system，刪最舊
-  }
-
-  const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${OPENROUTER_API_KEY}`,
-    },
-    body: JSON.stringify({
-      model: "deepseek/deepseek-chat",
-      messages,
-      temperature: 0.8,
-      max_tokens: 600,
-    }),
-  });
-
-  if (!response.ok) {
-    const text = await response.text().catch(() => "");
-    console.error("OpenRouter HTTP error:", response.status, text);
-    throw new Error(`OpenRouter error ${response.status}`);
-  }
-
-  const data = await response.json();
-  const reply =
-    data?.choices?.[0]?.message?.content?.trim() ||
-    "我這邊好像卡了一下，再跟我說一次好嗎？";
-
-  // 更新歷史
-  const newHistory = history.concat([
-    { role: "user", content: userText },
-    { role: "assistant", content: reply },
-  ]);
-  // 只存最近 N 則
-  while (newHistory.length > MAX_HISTORY_MESSAGES) {
-    newHistory.shift();
-  }
-  userHistories.set(userId, newHistory);
-
-  return reply;
-}
-
-// ---------- 回覆 LINE ----------
+// --- 回覆給 LINE ---
 async function replyToLine(replyToken, text) {
-  const res = await fetch("https://api.line.me/v2/bot/message/reply", {
+  if (!CHANNEL_ACCESS_TOKEN) {
+    console.error("LINE_CHANNEL_ACCESS_TOKEN is missing");
+    return;
+  }
+
+  await fetch("https://api.line.me/v2/bot/message/reply", {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
-      Authorization: `Bearer ${CHANNEL_ACCESS_TOKEN}`,
+      Authorization: `Bearer ${CHANNEL_ACCESS_TOKEN}`
     },
     body: JSON.stringify({
       replyToken,
-      messages: [{ type: "text", text }],
-    }),
+      messages: [{ type: "text", text }]
+    })
   });
-
-  if (!res.ok) {
-    const body = await res.text().catch(() => "");
-    console.error("LINE reply error:", res.status, body);
-  }
 }
 
-// ---------- Vercel Handler ----------
+// --- 主 handler ---
 export default async function handler(req, res) {
   try {
-    // 讀取原始 body（為了驗證簽章）
+    if (req.method !== "POST") {
+      // LINE 只會用 POST；其他方法回個 200 避免 404
+      return res.status(200).send("OK");
+    }
+
+    // 取得原始 body（字串）
     const body = await new Promise((resolve) => {
       let data = "";
       req.on("data", (chunk) => (data += chunk));
       req.on("end", () => resolve(data));
     });
 
+    // 驗證簽章
     const signature = req.headers["x-line-signature"];
-    if (!validateSignature(body, signature)) {
-      console.error("Invalid signature");
+    if (!signature || !validateSignature(body, signature)) {
+      console.error("Invalid LINE signature");
       return res.status(400).send("Invalid signature");
     }
 
     const json = JSON.parse(body);
     const events = json.events || [];
 
-    // 逐個事件處理
+    // 目前一次 webhook 通常只有一個 event，
+    // 但這裡還是用 for-of 預備之後可能的多事件情況。
     for (const event of events) {
       if (event.type !== "message") continue;
       if (!event.message || event.message.type !== "text") continue;
 
-      const userId = event.source?.userId || "unknown";
-      const replyToken = event.replyToken;
-      const rawText = event.message.text || "";
+      const userText = (event.message.text || "").trim();
+      if (!userText) continue;
 
-      // 收集短訊息，合併成一句
-      const mergedText = await bufferUserText(userId, rawText);
-
-      // 如果因為全部是空白或 emoji 導致沒有內容，就不要呼叫模型
-      if (!mergedText || mergedText.trim().length === 0) {
-        await replyToLine(
-          replyToken,
-          "我有看到妳的訊息喔～如果想跟我抱怨或聊天，直接跟我說就好 ❤️"
-        );
-        continue;
-      }
-
-      let aiReply;
-      try {
-        aiReply = await callDeepSeekChat(userId, mergedText);
-      } catch (err) {
-        console.error("DeepSeek call failed:", err);
-        aiReply =
-          "我這邊連線好像出了一點狀況，先跟妳說聲抱歉 QQ\n要不要先深呼吸、喝點溫的，再稍微等等我？";
-      }
-
-      await replyToLine(replyToken, aiReply);
+      const replyText = await askDeepSeek(userText);
+      await replyToLine(event.replyToken, replyText);
     }
 
-    res.status(200).send("OK");
+    return res.status(200).send("OK");
   } catch (err) {
-    console.error("Handler error:", err);
-    res.status(500).send("Internal Server Error");
+    console.error("LINE handler error:", err);
+    // 盡量不要讓 LINE 收到 5xx，不然會一直重送
+    return res.status(200).send("OK");
   }
 }
